@@ -1,0 +1,276 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cctype>
+
+using namespace std;
+
+/* ============================================================
+   BASE CLASS: Sequence (ABSTRACT)
+   ============================================================ */
+
+class Sequence {
+protected:
+    string data;
+    static int count;
+
+public:
+    Sequence(const string& d) : data(d) {
+        ++count;
+        cout << "Sequence created. Active sequences: " << count << endl;
+    }
+
+    // IMPORTANT: virtual destructor for polymorphic deletion
+    virtual ~Sequence() {
+        --count;
+        cout << "Sequence destroyed. Active sequences: " << count << endl;
+    }
+
+    size_t length() const {
+        return data.size();
+    }
+
+    // Pure virtual => Sequence is abstract
+    virtual void describe() const = 0;
+    virtual bool isValid() const = 0;
+
+    static int getCount() {
+        return count;
+    }
+};
+
+int Sequence::count = 0;
+
+
+/* ============================================================
+   DERIVED CLASS: DNASequence
+   ============================================================ */
+
+class DNASequence : public Sequence {
+public:
+    DNASequence(const string& d) : Sequence(d) {
+        cout << "DNASequence created\n";
+    }
+
+    ~DNASequence() override {
+        cout << "DNASequence destroyed\n";
+    }
+
+    void describe() const override {
+        cout << "DNA sequence: " << data << endl;
+    }
+
+    static bool isValidBase(char c) {
+        char u = toupper(static_cast<unsigned char>(c));
+        return (u=='A' || u=='C' || u=='G' || u=='T');
+    }
+
+    bool isValid() const override {
+        for (char c : data) {
+            if (!isValidBase(c)) return false;
+        }
+        return true;
+    }
+};
+
+
+/* ============================================================
+   DERIVED CLASS: RNASequence
+   ============================================================ */
+
+class RNASequence : public Sequence {
+public:
+    RNASequence(const string& d) : Sequence(d) {
+        cout << "RNASequence created\n";
+    }
+
+    ~RNASequence() override {
+        cout << "RNASequence destroyed\n";
+    }
+
+    void describe() const override {
+        cout << "RNA sequence: " << data << endl;
+    }
+
+    static bool isValidBase(char c) {
+        char u = toupper(static_cast<unsigned char>(c));
+        return (u=='A' || u=='C' || u=='G' || u=='U');
+    }
+
+    bool isValid() const override {
+        for (char c : data) {
+            if (!isValidBase(c)) return false;
+        }
+        return true;
+    }
+};
+
+
+/* ============================================================
+   DERIVED CLASS: ProteinSequence
+   ============================================================ */
+
+class ProteinSequence : public Sequence {
+public:
+    ProteinSequence(const string& d) : Sequence(d) {
+        cout << "ProteinSequence created\n";
+    }
+
+    ~ProteinSequence() override {
+        cout << "ProteinSequence destroyed\n";
+    }
+
+    void describe() const override {
+        cout << "Protein sequence: " << data << endl;
+    }
+
+    static bool isValidAA(char c) {
+        const string valid = "ACDEFGHIKLMNPQRSTVWY";
+        char u = toupper(static_cast<unsigned char>(c));
+        return valid.find(u) != string::npos;
+    }
+
+    bool isValid() const override {
+        for (char c : data) {
+            if (!isValidAA(c)) return false;
+        }
+        return true;
+    }
+};
+
+
+/* ============================================================
+   CLASS: Isoform (Composition with RNASequence)
+   ============================================================ */
+
+class Isoform {
+private:
+    string id;
+    string name;
+    RNASequence seq;
+
+public:
+    Isoform(const string& i, const string& n, const string& rna)
+        : id(i), name(n), seq(rna) {
+        cout << "Isoform created: " << name << endl;
+
+        if (!seq.isValid()) {
+            cout << "Warning: RNA sequence of " << name << " has invalid bases\n";
+        }
+    }
+
+    ~Isoform() {
+        cout << "Isoform destroyed: " << name << endl;
+    }
+
+    void describe() const {
+        cout << "Isoform " << id << " (" << name << ")\n";
+
+        // Polymorphic call μέσω base pointer
+        const Sequence* p = &seq;
+        p->describe();
+
+        cout << "Length: " << p->length() << " bases\n";
+    }
+};
+
+
+/* ============================================================
+   CLASS: Gene (contains vector<Isoform>)
+   ============================================================ */
+
+class Gene {
+private:
+    string id;
+    string name;
+    string chrom;
+    int start;
+    int end;
+    char strand;
+    vector<Isoform> isoforms;
+
+public:
+    Gene(const string& gid,
+         const string& gname,
+         const string& chr,
+         int s,
+         int e,
+         char st)
+        : id(gid), name(gname), chrom(chr), start(s), end(e), strand(st) {
+        cout << "Gene created: " << name << endl;
+    }
+
+    ~Gene() {
+        cout << "Gene destroyed: " << name << endl;
+    }
+
+    void addIsoform(const Isoform& iso) {
+        isoforms.push_back(iso);
+    }
+
+    void describe() const {
+        cout << "Gene " << id << " (" << name << ") on "
+             << chrom << ":" << start << "-" << end
+             << " (" << strand << " strand)\n";
+
+        cout << "Active sequences: " << Sequence::getCount() << endl;
+
+        if (isoforms.empty()) {
+            cout << "No isoforms\n";
+            return;
+        }
+
+        cout << "Isoforms:\n";
+        for (auto it = isoforms.begin(); it != isoforms.end(); ++it) {
+            it->describe();
+        }
+    }
+};
+
+
+/* ============================================================
+   MAIN (POLYMORPHISM DEMO)
+   ============================================================ */
+
+int main() {
+
+    cout << "--- Testing polymorphic standalone sequences ---\n";
+
+    vector<Sequence*> seqs;
+    seqs.push_back(new DNASequence("ACGTACGT"));
+    seqs.push_back(new RNASequence("AUGCCAGGAU"));
+    seqs.push_back(new ProteinSequence("MTAKPL"));
+
+    for (Sequence* s : seqs) {
+        s->describe(); // polymorphic
+        cout << "Length: " << s->length() << endl;
+        cout << "Valid? " << (s->isValid() ? "Yes" : "No") << endl;
+        cout << "----\n";
+    }
+
+    cout << "Active sequences now: " << Sequence::getCount() << endl;
+
+    cout << "\n--- Deleting polymorphic sequences (virtual destructor demo) ---\n";
+    for (Sequence* s : seqs) {
+        delete s; // MUST call derived destructors correctly
+    }
+    seqs.clear();
+
+    cout << "Active sequences after deletes: " << Sequence::getCount() << endl;
+
+    cout << "\n--- Gene with Isoforms (RNASequence shown polymorphically) ---\n";
+
+    Gene g1("ENSG000001", "TP53", "chr17", 7668402, 7687550, '-');
+
+    Isoform iso1("ENST0001", "TP53-201", "AUGGCCAUGGCGCCC");
+    Isoform iso2("ENST0002", "TP53-202", "AUGCCUGAUGCUGUAG");
+
+    g1.addIsoform(iso1);
+    g1.addIsoform(iso2);
+
+    cout << endl;
+    g1.describe();
+
+    cout << "\n--- End of main ---\n";
+    return 0;
+}
